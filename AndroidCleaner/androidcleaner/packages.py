@@ -9,6 +9,8 @@ from .adb import PROJECT_ROOT, Adb, AdbError, q
 from .journal import Journal
 
 QUARANTINE_DIR = PROJECT_ROOT / "quarantine"
+SECURE_SETTINGS_HINT = ("the phone blocks ADB from changing system settings. On Xiaomi/Redmi/POCO "
+                        "enable Developer options > 'USB debugging (Security settings)', then retry.")
 
 
 @dataclass
@@ -148,6 +150,8 @@ class PackageActions:
             msg = next((l for l in out.splitlines() if "Exception:" in l or "Failure" in l),
                        out.splitlines()[0] if out else "")
             out = msg.split("Exception:", 1)[-1].strip()
+            if "WRITE_SECURE_SETTINGS" in out or "MANAGE_APP_OPS" in out:
+                out += f" -- {SECURE_SETTINGS_HINT}"
         return ok, out
 
     def disable(self, pkg: str) -> tuple[bool, str]:

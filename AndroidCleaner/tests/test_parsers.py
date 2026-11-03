@@ -97,6 +97,23 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(score_package(play, access).verdict, "OK")
         self.assertEqual(score_package(preload, access).verdict, "OK")
 
+    def test_miui_data_app_preloads_are_clean(self):
+        # Real cases from a POCO F3 on MIUI / Android 11.
+        wps = Package("cn.wps.xiaomi.abroad.lite", path="/data/app/wps_lite/wps_lite.apk",
+                      installer="null", has_launcher=False, first_install="1970-01-02 14:48:18")
+        amazon = Package("com.amazon.appmanager",
+                         path="/data/app/~~f4f==/com.amazon.appmanager-G3b==/base.apk",
+                         installer="android", has_launcher=False,
+                         first_install="2022-03-19 19:05:05")
+        self.assertEqual(score_package(wps, NO_ACCESS).verdict, "OK")
+        self.assertEqual(score_package(amazon, NO_ACCESS).verdict, "OK")
+
+    def test_hidden_sideload_with_base_apk_still_flagged(self):
+        p = Package("com.hidden.thing", path="/data/app/~~a==/com.hidden.thing-b==/base.apk",
+                    installer="com.google.android.packageinstaller", has_launcher=False,
+                    first_install="2026-10-01 10:00:00")
+        self.assertEqual(score_package(p, NO_ACCESS).verdict, "MEDIUM")
+
 
 class DebloatTests(unittest.TestCase):
     def test_list_is_well_formed(self):

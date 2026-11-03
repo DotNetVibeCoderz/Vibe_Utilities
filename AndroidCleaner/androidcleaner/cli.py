@@ -381,12 +381,15 @@ def cmd_ads(args) -> int:
             print(f"    {name:20} {host:30} {desc}")
         return 0
     if args.ads_cmd == "dns":
-        if args.provider == "off":
-            adblock.set_private_dns(adb, actions, None)
+        host = None if args.provider == "off" else \
+            adblock.DNS_PROVIDERS.get(args.provider, (args.provider, ""))[0]
+        ok, err = adblock.set_private_dns(adb, actions, host)
+        if not ok:
+            print(f"  FAILED to set Private DNS: {err}")
+            return 1
+        if host is None:
             print("  Private DNS set back to automatic.")
             return 0
-        host = adblock.DNS_PROVIDERS.get(args.provider, (args.provider, ""))[0]
-        adblock.set_private_dns(adb, actions, host)
         print(f"  Private DNS -> {host}")
         print("  Ads are now filtered for every app and browser (Wi-Fi and mobile data).")
         print("  If a site or app breaks, run: python -m androidcleaner ads dns off")

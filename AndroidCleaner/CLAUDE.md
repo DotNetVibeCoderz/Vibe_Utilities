@@ -37,6 +37,13 @@ Use `-n/--dry-run` to see the exact `adb shell` commands without changing the de
 - On this build, `dumpsys package packages` does not include `requested permissions:`. Only granted install/runtime permissions are available in bulk, so scoring relies on `granted_perms`.
 - Shell can read and delete `/sdcard/Android/data/*/cache` on Android 14.
 
+## Device behaviour learned on a second phone (POCO F3 M2012K11AG, MIUI 12.0.2, Android 11)
+
+- `pm disable-user` works for system packages here (the HyperOS refusal is version-specific).
+- Without Developer options > "USB debugging (Security settings)", `settings put global ...` throws `SecurityException ... WRITE_SECURE_SETTINGS`. `PackageActions._exec` appends `SECURE_SETTINGS_HINT`, and `adblock.set_private_dns()` reads the values back and returns `(ok, err)`; never print success without checking it. After the user enables that option, it only takes effect once USB debugging is toggled off/on and the cable replugged; restarting adb from the PC is not enough.
+- Old MIUI preloads look like user apps: `/data/app/<name>/<name>.apk` (not `base.apk`), installer `android`, or `firstInstallTime` in 1970. `scanner.is_oem_preload()` covers these. `usage.py` deliberately still treats `/data/app` preloads as user apps, because uninstalling them deletes the APK, so they need a backup.
+- `com.xiaomi.discover` silently installs promotional games; they show up with installer `com.xiaomi.discover`.
+
 ## Generated, git-ignored directories
 
 `.tools/` (adb), `journal/` (undo log, keep it so `restore` works), `quarantine/` (APK backups), `reports/` (scan JSON).

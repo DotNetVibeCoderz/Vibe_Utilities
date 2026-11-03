@@ -131,14 +131,31 @@ def special_access(adb: Adb) -> dict[str, set[str]]:
     }
 
 
+def is_oem_preload(p: Package) -> bool:
+    """Apps the manufacturer put on the phone, as opposed to ones the user installed.
+
+    - APK on a read-only partition (/product/data-app, /system/...): removable preload.
+    - installer "android": installed by the system itself (MIUI preinstall provisioning).
+    - Older MIUI copies preloads into /data/app/<name>/<name>.apk at first boot; user installs
+      always get .../base.apk.
+    - firstInstallTime in 1970: installed at first boot, before the clock was set.
+    """
+    if p.path and not p.path.startswith("/data/"):
+        return True
+    if p.installer == "android":
+        return True
+    if p.path.startswith("/data/app/") and not p.path.endswith("/base.apk"):
+        return True
+    return p.first_install.startswith("1970-")
+
+
 def score_package(p: Package, access: dict[str, set[str]]) -> Finding:
     f = Finding(p.name, system=p.system, installer=p.installer,
                 has_launcher=p.has_launcher, path=p.path)
     if p.name in KNOWN_GOOD:
         return f
     third_party = not p.system
-    # Removable OEM preloads live outside /data (e.g. /product/data-app) and have no installer.
-    preload = third_party and bool(p.path) and not p.path.startswith("/data/")
+    preload = third_party and is_oem_preload(p)
     store = p.installer in TRUSTED_INSTALLERS
     sideloaded = third_party and not preload and not store and p.installer in SIDELOAD_INSTALLERS
     # Untrusted origin = user-installed APK or an unknown installer: full weight for risky traits.

@@ -35,15 +35,24 @@ def dns_validated(adb: Adb) -> list[str]:
     return sorted(set(addrs))
 
 
-def set_private_dns(adb: Adb, actions: PackageActions, hostname: str | None) -> None:
-    """hostname=None turns Private DNS back to automatic (opportunistic)."""
+def set_private_dns(adb: Adb, actions: PackageActions, hostname: str | None) -> tuple[bool, str]:
+    """hostname=None turns Private DNS back to automatic (opportunistic).
+    Returns (ok, error). The values are read back, because a refused write is not always loud."""
     if adb.sdk() < 28:
-        raise RuntimeError("Private DNS needs Android 9 or newer.")
-    if hostname is None:
-        actions.put_setting("global", "private_dns_mode", "opportunistic")
-        return
-    actions.put_setting("global", "private_dns_specifier", hostname)
-    actions.put_setting("global", "private_dns_mode", "hostname")
+        return False, "Private DNS needs Android 9 or newer."
+    steps = ([("private_dns_mode", "opportunistic")] if hostname is None else
+             [("private_dns_specifier", hostname), ("private_dns_mode", "hostname")])
+    for key, value in steps:
+        ok, out = actions.put_setting("global", key, value)
+        if not ok:
+            return False, out
+    if actions.dry_run:
+        return True, ""
+    mode, spec = dns_status(adb)
+    want_mode = "opportunistic" if hostname is None else "hostname"
+    if mode != want_mode or (hostname and spec != hostname):
+        return False, f"setting did not stick (mode={mode}, host={spec})"
+    return True, ""
 
 
 def overlay_apps(adb: Adb, third_party: set[str]) -> list[str]:

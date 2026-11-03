@@ -16,8 +16,11 @@ Jalankan `powershell -File scripts\install_platform_tools.ps1`, atau set variabe
 ### `Several devices connected; pass --serial`
 Lihat serial dengan `ac devices`, lalu tambahkan `-s SERIAL`. Emulator yang sedang berjalan juga terhitung.
 
-### `SecurityException` / `not allowed` saat mengubah setting (Xiaomi)
-Aktifkan **Developer options → USB debugging (Security settings)**. Opsi ini butuh SIM card dan login Mi Account.
+### `WRITE_SECURE_SETTINGS` / `FAILED to set Private DNS` (Xiaomi)
+1. Aktifkan **Developer options → USB debugging (Security settings)**. Opsi ini butuh SIM card dan login Mi Account.
+2. **Matikan lalu nyalakan lagi USB debugging, cabut-colok kabel, lalu tekan Allow.** Di MIUI, izin baru berlaku setelah langkah ini. Me-restart ADB dari PC (`adb kill-server`, `adb reconnect`, `adb usb`) tidak cukup (sudah diuji di POCO F3, MIUI 12).
+3. Masih gagal? Restart HP.
+4. Alternatif tanpa tools: Settings → Connection & sharing → Private DNS → isi `dns.adguard-dns.com`.
 
 ### `Cannot disable system packages`
 Ini normal di HyperOS/MIUI. Tools otomatis memakai uninstall untuk user 0. Lihat [06 - Bloatware](06-bloatware.md#mode).
