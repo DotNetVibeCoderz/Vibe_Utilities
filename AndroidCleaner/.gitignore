@@ -1,0 +1,6 @@
+.tools/
+journal/
+quarantine/
+reports/
+__pycache__/
+*.pyc
