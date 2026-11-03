@@ -44,6 +44,14 @@ Use `-n/--dry-run` to see the exact `adb shell` commands without changing the de
 - Old MIUI preloads look like user apps: `/data/app/<name>/<name>.apk` (not `base.apk`), installer `android`, or `firstInstallTime` in 1970. `scanner.is_oem_preload()` covers these. `usage.py` deliberately still treats `/data/app` preloads as user apps, because uninstalling them deletes the APK, so they need a backup.
 - `com.xiaomi.discover` silently installs promotional games; they show up with installer `com.xiaomi.discover`.
 
+## Device behaviour learned on a third phone (Galaxy S10 SM-G973F, One UI, Android 9)
+
+- `dumpsys usagestats` has one block per user (`user=0`, `user=150` = Secure Folder); `parse_usagestats` reads only user 0. History can be reset to a few hours; `window_days()` turns the locale-formatted yearly `timeRange` into days (both d/m and m/d tried, shorter wins), and `unused`/`checkup` refuse to list apps when it is shorter than `--days` (`unused --force` overrides).
+- No `ValidatedPrivateDnsAddresses` in `dumpsys connectivity`: `parse_dns_validation()` falls back to `UsePrivateDns: true PrivateDnsServerName: <host>` on a `VALIDATED` network. `ad_block_probe()` pings `doubleclick.net` on the phone; AdGuard answers 127.0.0.1 there.
+- Old WhatsApp path `/sdcard/WhatsApp/.Shared`; `*.log`/`*.tmp` under Download/Documents/WhatsApp Documents/WhatsApp Media are user files (`cleaner.keep_file`). Files inside `JUNK_DIRS` are not counted again as junk files.
+- `DCIM/.thumbnails` held 54,688 files: `rm dir/*` failed with "Argument list too long" while the tool reported success. Deletes now go through `find ... -exec rm -rf {} +`, and `clean_junk_dirs` re-measures each folder and reports what could not be deleted.
+- Galaxy Watch plugins come from installer `com.samsung.android.app.watchmanager` (trusted); Xamarin debug runtimes `Mono.Android.*` are skipped by the scanner.
+
 ## Generated, git-ignored directories
 
 `.tools/` (adb), `journal/` (undo log, keep it so `restore` works), `quarantine/` (APK backups), `reports/` (scan JSON).

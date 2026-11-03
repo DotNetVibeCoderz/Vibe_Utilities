@@ -24,10 +24,21 @@ JUNK_DIRS = [
     "/sdcard/logs",
     "/sdcard/tencent/msflogs",
     "/sdcard/Android/media/com.whatsapp/WhatsApp/.Shared",
+    "/sdcard/WhatsApp/.Shared",          # pre-Android 11 WhatsApp location
     "/data/local/tmp",
 ]
 # Files on shared storage that are leftovers (searched with find, depth-limited).
 JUNK_FILE_PATTERNS = ["*.tmp", "*.temp", "*.log", "thumbdata*", ".thumbdata*"]
+# Folders where *.log / *.tmp names can be real files someone received or saved.
+KEEP_PATH_PARTS = ("/Download/", "/Documents/", "/WhatsApp Documents/", "/WhatsApp/Media/")
+
+
+def keep_file(path: str) -> bool:
+    """True for files the junk-file sweep must not touch: user document folders, and anything
+    inside a JUNK_DIRS folder (already emptied and counted there)."""
+    if any(part in path for part in KEEP_PATH_PARTS):
+        return True
+    return any(path.startswith(d.rstrip("/") + "/") for d in JUNK_DIRS)
 
 
 @dataclass
@@ -92,7 +103,7 @@ def find_junk_files(adb: Adb) -> list[tuple[str, int]]:
     rows = []
     for line in out.splitlines():
         m = re.match(r"^(\d+)\s+(\S.*)$", line.strip())
-        if m:
+        if m and not keep_file(m.group(2)):
             rows.append((m.group(2), int(m.group(1))))
     return rows
 
@@ -134,7 +145,9 @@ class Cleaner:
 
     def _rm(self, target: str, contents_only: bool = True) -> None:
         if contents_only:
-            cmd = f"rm -rf {q(target)}/* {q(target)}/.[!.]* 2>/dev/null"
+            # Not `rm dir/*`: a shell glob over tens of thousands of files (Samsung Gallery
+            # thumbnails) fails with "Argument list too long". find batches the arguments.
+            cmd = f"find {q(target)} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + 2>/dev/null"
         else:
             cmd = f"rm -rf {q(target)} 2>/dev/null"
         if self.dry_run:
@@ -160,7 +173,9 @@ class Cleaner:
         if len(dirs) > 10:
             self.log(f"    ... and {len(dirs) - 10} more")
         if dirs:
-            cmd = "rm -rf /sdcard/Android/data/*/cache/* 2>/dev/null"
+            # Same "Argument list too long" risk as _rm, so delete via find instead of a glob.
+            cmd = ("find /sdcard/Android/data/ -mindepth 3 -maxdepth 3 -path '*/cache/*' "
+                   "-exec rm -rf {} + 2>/dev/null")
             if self.dry_run:
                 self.log(f"  [dry-run] adb shell {cmd}")
             else:
@@ -172,9 +187,12 @@ class Cleaner:
         for d in JUNK_DIRS:
             kb = du_kb(self.adb, d)
             if kb > 4:
-                self.log(f"    {human(kb):>10}  {d}")
-                total += kb
                 self._rm(d)
+                left = kb if self.dry_run else du_kb(self.adb, d)
+                freed = kb - left if not self.dry_run else kb
+                note = f"  (could not delete {human(left)})" if left > max(1024, kb // 10) else ""
+                self.log(f"    {human(kb):>10}  {d}{note}")
+                total += freed
         return total
 
     def clean_junk_files(self) -> int:

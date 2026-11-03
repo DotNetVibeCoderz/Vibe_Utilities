@@ -51,7 +51,16 @@ def parse_usagestats(output: str) -> tuple[dict[str, dict], str]:
     stats: dict[str, dict] = {}
     window = ""
     in_yearly = False
+    user = "0"
     for line in output.splitlines():
+        # Other users (Samsung Secure Folder = 150, MIUI Second space, work profile) have their
+        # own blocks; only the main user's history says whether the owner uses an app.
+        mu = re.match(r"^user=(\d+)", line)
+        if mu:
+            user = mu.group(1)
+            continue
+        if user != "0":
+            continue
         if "In-memory yearly stats" in line:
             in_yearly = True
             continue
@@ -100,6 +109,26 @@ def parse_diskstats(output: str) -> dict[str, int]:
     return sizes
 
 
+def window_days(window: str, now: datetime) -> float | None:
+    """How many days of history the yearly timeRange covers. The date format follows the phone's
+    locale ("20/9/2026, 11.01 – ...", "3/11/2026 11.56–13.10", US m/d/y), so both day/month
+    orders are tried and the shorter plausible coverage wins. None if no date is found."""
+    m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", window)
+    if not m:
+        return None
+    a, b, y = (int(x) for x in m.groups())
+    spans = []
+    for day, month in ((a, b), (b, a)):
+        try:
+            start = datetime(y, month, day)
+        except ValueError:
+            continue
+        span = (now - start).total_seconds() / 86400
+        if span >= -1:
+            spans.append(max(span, 0.0))
+    return min(spans) if spans else None
+
+
 def _days_since(stamp: str, now: datetime) -> int | None:
     try:
         return (now - datetime.strptime(stamp[:19], "%Y-%m-%d %H:%M:%S")).days
@@ -109,14 +138,18 @@ def _days_since(stamp: str, now: datetime) -> int | None:
 
 def find_unused(adb: Adb, pkgs: dict[str, Package], days: int = 30,
                 include_system: bool = False, now: datetime | None = None
-                ) -> tuple[list[AppUsage], str]:
+                ) -> tuple[list[AppUsage], str, float | None]:
+    """Returns (apps, window text, days of history). When the history is shorter than `days`,
+    "never used" only means "not used since the history started"; callers must not offer
+    those apps for removal without saying so."""
     stats, window = parse_usagestats(adb.shell("dumpsys usagestats", timeout=600))
     sizes = parse_diskstats(adb.shell("dumpsys diskstats", timeout=600))
     now = now or datetime.now()
     home = adb.shell("cmd package resolve-activity --brief -a android.intent.action.MAIN "
                      "-c android.intent.category.HOME").strip().splitlines()
     protected = PROTECTED | {l.split("/")[0] for l in home if "/" in l}
-    return select_unused(pkgs, stats, sizes, days, include_system, now, protected), window
+    apps = select_unused(pkgs, stats, sizes, days, include_system, now, protected)
+    return apps, window, window_days(window, now)
 
 
 def select_unused(pkgs: dict[str, Package], stats: dict[str, dict], sizes: dict[str, int],

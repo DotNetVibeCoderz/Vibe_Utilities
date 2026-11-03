@@ -29,10 +29,37 @@ def dns_validated(adb: Adb) -> list[str]:
     """Resolver addresses the phone has actually validated for Private DNS (empty = not working
     or not enabled). Taken from the active networks in `dumpsys connectivity`."""
     out = adb.shell("dumpsys connectivity", timeout=120)
+    return parse_dns_validation(out)
+
+
+def parse_dns_validation(dumpsys_connectivity: str) -> list[str]:
+    """Android 10+ lists `ValidatedPrivateDnsAddresses: [...]`. Android 9 does not; there a
+    network that is VALIDATED while `UsePrivateDns: true PrivateDnsServerName: <host>` means
+    strict-mode DNS-over-TLS works (validation would fail otherwise), so the host is returned."""
     addrs: list[str] = []
-    for m in re.finditer(r"ValidatedPrivateDnsAddresses: \[([^\]]*)\]", out):
+    for m in re.finditer(r"ValidatedPrivateDnsAddresses: \[([^\]]*)\]", dumpsys_connectivity):
         addrs += [a.strip() for a in m.group(1).split(",") if a.strip()]
-    return sorted(set(addrs))
+    if addrs:
+        return sorted(set(addrs))
+    if "ValidatedPrivateDnsAddresses" in dumpsys_connectivity:
+        return []  # Android 10+ format and nothing validated
+    for m in re.finditer(r"UsePrivateDns: true PrivateDnsServerName: (\S+).{0,400}?Capabilities: (\S+)",
+                         dumpsys_connectivity, re.S):
+        if m.group(1) != "null" and "VALIDATED" in m.group(2).split("&"):
+            return [m.group(1)]
+    return []
+
+
+BLOCKED_IPS = {"0.0.0.0", "127.0.0.1", "::", "::1"}
+
+
+def ad_block_probe(adb: Adb, domain: str = "doubleclick.net") -> str:
+    """Resolve a well-known ad domain on the phone. Returns 'blocked', 'not blocked' or 'unknown'."""
+    out = adb.shell(f"ping -c 1 -W 2 {domain} 2>&1 | head -1", timeout=30)
+    m = re.search(r"\(([0-9a-fA-F:.]+)\)", out)
+    if m:
+        return "blocked" if m.group(1) in BLOCKED_IPS else "not blocked"
+    return "blocked" if "unknown host" in out.lower() else "unknown"
 
 
 def set_private_dns(adb: Adb, actions: PackageActions, hostname: str | None) -> tuple[bool, str]:

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from androidcleaner.packages import Package
 from androidcleaner.usage import (_duration_seconds, parse_diskstats, parse_selection,
-                                  parse_usagestats, select_unused)
+                                  parse_usagestats, select_unused, window_days)
 
 USAGE = '''\
   In-memory daily stats
@@ -63,6 +63,24 @@ class UsageTests(unittest.TestCase):
         with_sys = select_unused(pkgs, stats, {}, 30, True, NOW)
         self.assertIn("com.sys.tool", [u.pkg for u in with_sys])
         self.assertNotIn("com.android.settings", [u.pkg for u in with_sys])
+
+    def test_only_main_user_counts(self):
+        # Samsung Secure Folder is user 150; using an app there must not count for user 0.
+        text = USAGE + '''user=150
+  In-memory yearly stats
+  timeRange="28/8/2026 17:03 – 3/11/2026 13:10"
+    packages
+      package=com.never totalTimeUsed="10.00" lastTimeUsed="2026-11-03 10:00:00" appLaunchCount=5
+'''
+        stats, window = parse_usagestats(text)
+        self.assertEqual(stats["com.never"]["last_used"], "")
+        self.assertTrue(window.startswith("20/9/2026"))
+
+    def test_window_days(self):
+        self.assertAlmostEqual(window_days("20/9/2026, 11.01 – 3/11/2026, 12.28", NOW), 44.5, places=1)
+        self.assertLess(window_days("3/11/2026 11.56–13.10", NOW), 1)          # reset today
+        self.assertAlmostEqual(window_days("9/20/2026 – 11/3/2026", NOW), 44.5, places=1)  # US order
+        self.assertIsNone(window_days("", NOW))
 
     def test_parse_selection(self):
         self.assertEqual(parse_selection("1,3,5-6", 6), [0, 2, 4, 5])

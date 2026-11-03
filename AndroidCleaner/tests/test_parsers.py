@@ -2,8 +2,9 @@
 import unittest
 
 from androidcleaner import debloat
+from androidcleaner.adblock import parse_dns_validation
 from androidcleaner.adb import parse_devices
-from androidcleaner.cleaner import parse_df
+from androidcleaner.cleaner import keep_file, parse_df
 from androidcleaner.cli import build_parser
 from androidcleaner.packages import (Package, parse_component_packages, parse_dumpsys_packages,
                                      parse_pm_list)
@@ -75,6 +76,31 @@ class ParserTests(unittest.TestCase):
         self.assertAlmostEqual(rows[0].pct, 20.9, places=1)
 
 
+class DnsValidationTests(unittest.TestCase):
+    def test_android_10_plus(self):
+        out = ("lp{{UsePrivateDns: true PrivateDnsServerName: dns.adguard-dns.com "
+               "ValidatedPrivateDnsAddresses: [185.113.30.30,2a10:50c0:6565::ad] Domains: null}}")
+        self.assertEqual(parse_dns_validation(out), ["185.113.30.30", "2a10:50c0:6565::ad"])
+        self.assertEqual(parse_dns_validation("UsePrivateDns: true ValidatedPrivateDnsAddresses: [ ]"), [])
+
+    def test_android_9(self):
+        # Real line shape from a Galaxy S10 on Android 9 (no ValidatedPrivateDnsAddresses field).
+        ok = ("lp{{UsePrivateDns: true PrivateDnsServerName: dns.adguard-dns.com Domains: null MTU: 0}}"
+              "  nc{[ Transports: WIFI Capabilities: NOT_METERED&INTERNET&TRUSTED&VALIDATED&NOT_ROAMING ]}")
+        self.assertEqual(parse_dns_validation(ok), ["dns.adguard-dns.com"])
+        self.assertEqual(parse_dns_validation(ok.replace("&VALIDATED", "")), [])
+        self.assertEqual(parse_dns_validation("UsePrivateDns: false PrivateDnsServerName: null"), [])
+
+
+class CleanerTests(unittest.TestCase):
+    def test_keep_user_documents_and_junk_dir_contents(self):
+        self.assertTrue(keep_file("/sdcard/WhatsApp/Media/WhatsApp Documents/sigeceLogs_271122.log"))
+        self.assertTrue(keep_file("/sdcard/Download/report.log"))
+        self.assertTrue(keep_file("/sdcard/DCIM/.thumbnails/.thumbdata4--1967290299"))  # counted as dir
+        self.assertFalse(keep_file("/sdcard/tencent/tmp/vodPcdnMSdkPeerId.log"))
+        self.assertFalse(keep_file("/sdcard/DCIM/Camera/20220805_162234.jpgc8e87bd4.tmp"))
+
+
 class ScoringTests(unittest.TestCase):
     def test_sideloaded_hidden_adware_is_high(self):
         p = Package("com.evil.cleaner", path="/data/app/x/base.apk",
@@ -107,6 +133,16 @@ class ScoringTests(unittest.TestCase):
                          first_install="2022-03-19 19:05:05")
         self.assertEqual(score_package(wps, NO_ACCESS).verdict, "OK")
         self.assertEqual(score_package(amazon, NO_ACCESS).verdict, "OK")
+
+    def test_samsung_watch_plugin_and_dev_runtimes_are_clean(self):
+        # Real cases from a Galaxy S10 (Android 9).
+        watch = Package("com.samsung.android.waterplugin", path="/data/app/x/base.apk",
+                        installer="com.samsung.android.app.watchmanager", has_launcher=False)
+        mono = Package("Mono.Android.Platform.ApiLevel_27", path="/data/app/y/base.apk",
+                       installer="", has_launcher=False)
+        access = dict(NO_ACCESS, notification_listener={"com.samsung.android.waterplugin"})
+        self.assertEqual(score_package(watch, access).verdict, "OK")
+        self.assertEqual(score_package(mono, NO_ACCESS).verdict, "OK")
 
     def test_hidden_sideload_with_base_apk_still_flagged(self):
         p = Package("com.hidden.thing", path="/data/app/~~a==/com.hidden.thing-b==/base.apk",

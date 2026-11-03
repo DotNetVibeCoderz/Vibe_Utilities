@@ -249,10 +249,18 @@ def cmd_unused(args) -> int:
     adb = get_adb(args)
     header(f"Apps not used in the last {args.days} days")
     pkgs = inventory(adb)
-    apps, window = usage.find_unused(adb, pkgs, args.days, args.system)
+    apps, window, coverage = usage.find_unused(adb, pkgs, args.days, args.system)
     if window:
         print(f"  Usage history available on the phone: {window}")
         print("  ('never' = not opened anywhere in that period)\n")
+    if coverage is not None and coverage < args.days:
+        print(f"  WARNING: the phone only has {coverage:.1f} day(s) of usage history, less than "
+              f"--days {args.days}.")
+        print("  Apps used daily before the history started would be listed as 'never'.")
+        if not args.force:
+            print("  Not listing anything. Try again once more history exists, or use --force.")
+            return 1
+        print("  --force given: listing anyway. Check every app before removing it.\n")
     if not apps:
         print("  None. Every app was used recently.")
         return 0
@@ -370,6 +378,7 @@ def cmd_ads(args) -> int:
         if mode == "hostname":
             valid = adblock.dns_validated(adb)
             print(f"  Resolver validated by phone: {', '.join(valid) if valid else 'NO (check network / hostname)'}")
+            print(f"  Test lookup of doubleclick.net: {adblock.ad_block_probe(adb)}")
         pkgs = inventory(adb, with_details=False)
         third = {p.name for p in pkgs.values() if not p.system and p.installed and p.enabled}
         ov = adblock.overlay_apps(adb, third)
@@ -501,6 +510,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--system", action="store_true", help="also list system apps that have an icon")
     s.add_argument("--select", help="remove these list numbers without prompting, e.g. 1,3,5-7")
     s.add_argument("--no-backup", action="store_true", help="do not pull APKs before uninstalling")
+    s.add_argument("--force", action="store_true",
+                   help="list apps even when the phone has less usage history than --days")
     s.set_defaults(func=cmd_unused)
 
     s = sub.add_parser("clean", parents=[common], help="clear app caches and junk files")

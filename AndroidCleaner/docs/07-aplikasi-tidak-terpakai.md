@@ -6,6 +6,7 @@ ac unused --days 60
 ac unused --system              # termasuk aplikasi sistem yang punya ikon
 ac unused --select 1,3,5-7      # langsung hapus nomor tertentu, tanpa prompt
 ac unused -n --select all       # simulasi: lihat apa yang akan terjadi
+ac unused --force                # tetap tampilkan walau riwayat HP lebih pendek dari --days
 ```
 
 ## Contoh tampilan
@@ -57,6 +58,11 @@ Pakai `--no-backup` kalau tidak perlu backup APK, misalnya karena aplikasinya bi
 - Aplikasi sistem, kecuali memakai `--system`.
 
 ## Batas akurasi
+
+**Jika riwayat pemakaian di HP lebih pendek dari `--days`, `unused` menolak membuat daftar** (exit code 1), dan checkup menulis "belum bisa dinilai". Dalam kondisi itu semua aplikasi yang tidak dibuka sejak riwayat dimulai akan tampil sebagai "never", termasuk WhatsApp yang dipakai setiap hari. Ini pernah terjadi di Galaxy S10 (Android 9) yang riwayatnya ter-reset dan hanya tersisa 1 jam. Tunggu sampai riwayat terkumpul, pakai `--days` yang lebih kecil, atau `--force` untuk tetap melihat daftar dengan peringatan.
+
+Hanya riwayat **user utama** yang dihitung. Pemakaian di Secure Folder Samsung, Second Space MIUI, atau profil kerja tidak membuat aplikasi di user utama dianggap dipakai.
+
 
 Data diambil dari `dumpsys usagestats`. Android hanya menyimpan riwayat terbatas: harian beberapa hari, mingguan beberapa minggu, bulanan beberapa bulan, tahunan sejak data tertua yang masih ada. Riwayat juga bisa terhapus setelah update sistem atau reset. **Rentang riwayat yang sebenarnya selalu ditampilkan di bagian atas.** "never" berarti tidak dibuka dalam rentang itu, bukan tidak pernah sama sekali.
 

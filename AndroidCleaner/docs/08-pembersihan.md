@@ -15,12 +15,12 @@ ac clean --large 500            # + tampilkan file > 500 MB untuk ditinjau sendi
    - `DCIM/.thumbnails`, `Pictures/.thumbnails`, `Movies/.thumbnails`, `Music/.thumbnails`
    - `LOST.DIR`, `.Trash`
    - `MIUI/debug_log`, `MIUI/.cache`, `log`, `logs`, `tencent/msflogs`
-   - `Android/media/com.whatsapp/WhatsApp/.Shared` (salinan sementara saat berbagi media dari WhatsApp)
+   - `Android/media/com.whatsapp/WhatsApp/.Shared` dan `WhatsApp/.Shared` (lokasi lama sebelum Android 11): salinan sementara saat berbagi media dari WhatsApp
    - `/data/local/tmp`
-4. **File sementara** hingga kedalaman 4 folder: `*.tmp`, `*.temp`, `*.log`, `thumbdata*` (tidak termasuk `Android/obb`).
-5. **Opsional:** installer APK (`--apks`), folder kosong (`--empty-dirs`), proses latar belakang (`--kill-background`).
+4. **File sementara** hingga kedalaman 4 folder: `*.tmp`, `*.temp`, `*.log`, `thumbdata*`. **Tidak termasuk** `Android/obb`, folder `Download`, `Documents`, `WhatsApp Documents`, dan `WhatsApp/Media`, karena file `.log` di sana bisa berupa dokumen yang diterima, bukan sampah. File di dalam folder sampah langkah 3 juga tidak dihitung dua kali.
+5. **Opsional:** installer APK (`--apks`; tinjau dulu daftarnya, karena APK di WhatsApp Documents/Download sering memang sengaja disimpan), folder kosong (`--empty-dirs`), proses latar belakang (`--kill-background`).
 
-Di akhir ditampilkan ruang kosong sebelum → sesudah. Waktu pembersihan dicatat di `journal\<serial>.lastclean` untuk `checkup`.
+Setiap folder sampah diukur ulang setelah dihapus. Jika ada isi yang tidak bisa dihapus (lebih dari 1 MB), muncul catatan `(could not delete ...)`. Di akhir ditampilkan ruang kosong sebelum → sesudah. Waktu pembersihan dicatat di `journal\<serial>.lastclean` untuk `checkup`.
 
 ## Yang TIDAK dihapus
 

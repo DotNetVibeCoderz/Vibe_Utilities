@@ -105,6 +105,11 @@ def run(adb: Adb, days: int = 30, log=print) -> tuple[list[Section], dict]:
     if mode == "hostname":
         valid = adblock.dns_validated(adb)
         s.lines.append(f"Private DNS: {spec}" + (" (tersambung)" if valid else " (BELUM tersambung)"))
+        probe = adblock.ad_block_probe(adb)
+        s.lines.append("Uji domain iklan (doubleclick.net): " + {
+            "blocked": "terblokir", "not blocked": "TIDAK terblokir", "unknown": "tidak bisa diuji"}[probe])
+        if probe == "not blocked" and spec in providers:
+            s.status = WARN
         if not valid:
             s.status = WARN
             s.lines.append("HP belum bisa memakai server DNS ini. Internet bisa gagal; cek jaringan.")
@@ -139,11 +144,19 @@ def run(adb: Adb, days: int = 30, log=print) -> tuple[list[Section], dict]:
     sections.append(s)
 
     log("  [5/6] cari aplikasi yang jarang dipakai...")
-    unused, window = usage.find_unused(adb, pkgs, days)
+    unused, window, coverage = usage.find_unused(adb, pkgs, days)
     s = Section(f"Aplikasi tidak dipakai > {days} hari")
     if window:
         s.lines.append(f"Riwayat pemakaian yang tersedia: {window}")
-    if unused:
+    if coverage is not None and coverage < days:
+        # Too little history: "never used" would include apps used every day before the reset.
+        s.lines.append(f"Riwayat pemakaian di HP ini hanya {coverage:.1f} hari (kurang dari {days} hari), "
+                       "jadi belum bisa dinilai aplikasi mana yang tidak dipakai. Cek lagi nanti "
+                       "setelah riwayatnya terkumpul.")
+        unused = []
+        s.lines.append(f"(Kalau tetap ingin melihat daftar: ac unused --days {max(int(coverage), 1)} "
+                       "atau ac unused --force)")
+    elif unused:
         total = sum(u.size_bytes for u in unused) / 1024
         s.status = WARN
         s.lines.append(f"{len(unused)} aplikasi, sekitar {h(total)}")
@@ -154,7 +167,7 @@ def run(adb: Adb, days: int = 30, log=print) -> tuple[list[Section], dict]:
         if len(unused) > 10:
             s.lines.append(f"... dan {len(unused) - 10} lainnya")
         s.actions.append(("ac unused", "pilih aplikasi yang mau dihapus dari daftar bernomor"))
-    else:
+    elif coverage is None or coverage >= days:
         s.lines.append("Tidak ada. Semua aplikasi dipakai.")
     sections.append(s)
 
@@ -178,10 +191,11 @@ def run(adb: Adb, days: int = 30, log=print) -> tuple[list[Section], dict]:
     s.lines.append(f"Cache aplikasi di penyimpanan bersama: {h(ext)}")
     s.lines.append(f"Thumbnail, log, file sementara: {h(junk_dirs + junk_files)}")
     if apks:
-        s.lines.append(f"{len(apks)} file installer APK sisa ({h(sum(kb for _, kb in apks))})")
+        s.lines.append(f"{len(apks)} file installer APK ({h(sum(kb for _, kb in apks))}). Tinjau dulu, "
+                       "bisa jadi sengaja disimpan; hapus dengan: ac clean --apks")
     if internal + junk_total > 200 * 1024:
         s.status = WARN
-        s.actions.append(("ac clean" + (" --apks" if apks else ""), "bersihkan cache & sampah"))
+        s.actions.append(("ac clean", "bersihkan cache & sampah"))
     sections.append(s)
 
     data = {"serial": adb.serial, "time": time.strftime("%Y-%m-%d %H:%M:%S"), **props,

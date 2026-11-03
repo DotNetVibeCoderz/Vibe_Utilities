@@ -25,11 +25,16 @@ TRUSTED_INSTALLERS = {
     "com.heytap.market", "com.oppo.market",
     "com.bbk.appstore",
     "com.amazon.venezia",
+    "com.samsung.android.app.watchmanager",  # Galaxy Wearable installs watch plugins
     "com.facebook.system",                 # preinstalled Facebook installer
     "com.google.android.feedback",         # Play on some older builds
 }
 SIDELOAD_INSTALLERS = {"", "null", "com.google.android.packageinstaller",
                        "com.android.packageinstaller", "com.android.shell", "adb"}
+
+# Shared runtimes that Visual Studio pushes when debugging Xamarin/.NET MAUI apps over USB:
+# sideloaded and without an icon by design.
+DEV_RUNTIME_PREFIXES = ("Mono.Android.DebugRuntime", "Mono.Android.Platform.ApiLevel_")
 
 # Apps that legitimately hold powerful access; they are still listed, just not scored.
 KNOWN_GOOD = {
@@ -152,7 +157,7 @@ def is_oem_preload(p: Package) -> bool:
 def score_package(p: Package, access: dict[str, set[str]]) -> Finding:
     f = Finding(p.name, system=p.system, installer=p.installer,
                 has_launcher=p.has_launcher, path=p.path)
-    if p.name in KNOWN_GOOD:
+    if p.name in KNOWN_GOOD or p.name.startswith(DEV_RUNTIME_PREFIXES):
         return f
     third_party = not p.system
     preload = third_party and is_oem_preload(p)

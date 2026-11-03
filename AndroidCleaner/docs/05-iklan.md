@@ -29,7 +29,7 @@ ac ads dns dns.nextdns.io     # atau hostname DNS-over-TLS lain
 | `cloudflare-security` | security.cloudflare-dns.com | Hanya malware (tidak memblokir iklan) |
 | `quad9` | dns.quad9.net | Hanya malware (tidak memblokir iklan) |
 
-`ac ads status` juga menampilkan **"Resolver validated by phone"**, yaitu alamat server yang benar-benar berhasil dihubungi HP. Jika tertulis `NO`, HP tidak bisa memakai server tersebut dan internet bisa terganggu. Ganti server lain atau jalankan `ac ads dns off`.
+`ac ads status` juga menampilkan **"Test lookup of doubleclick.net"**: domain iklan diuji langsung dari HP, dan harus bernilai `blocked`. Selain itu ada **"Resolver validated by phone"**, yaitu alamat server yang benar-benar berhasil dihubungi HP. Di Android 10+ yang ditampilkan adalah alamat IP server; di Android 9 yang ditampilkan nama host-nya, karena Android 9 tidak mencatat alamat IP-nya. Jika tertulis `NO`, HP tidak bisa memakai server tersebut dan internet bisa terganggu. Ganti server lain atau jalankan `ac ads dns off`.
 
 **Keterbatasan:**
 - Iklan YouTube dan iklan yang disajikan dari domain yang sama dengan kontennya tidak bisa diblokir lewat DNS.

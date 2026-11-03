@@ -86,7 +86,7 @@ Tanpa `--apply`, perintah ini hanya menampilkan preview. Lihat [06 - Bloatware](
 
 ### `unused`
 ```
-ac unused [--days N] [--system] [--select 1,3,5-7] [--no-backup]
+ac unused [--days N] [--system] [--select 1,3,5-7] [--no-backup] [--force]
 ```
 Lihat [07 - Aplikasi tidak terpakai](07-aplikasi-tidak-terpakai.md).
 
