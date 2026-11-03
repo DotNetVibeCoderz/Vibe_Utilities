@@ -371,7 +371,7 @@ def cmd_ads(args) -> int:
             valid = adblock.dns_validated(adb)
             print(f"  Resolver validated by phone: {', '.join(valid) if valid else 'NO (check network / hostname)'}")
         pkgs = inventory(adb, with_details=False)
-        third = {p.name for p in pkgs.values() if not p.system and p.installed}
+        third = {p.name for p in pkgs.values() if not p.system and p.installed and p.enabled}
         ov = adblock.overlay_apps(adb, third)
         print(f"\n  User apps allowed to draw over other apps ({len(ov)}):")
         for p in ov:

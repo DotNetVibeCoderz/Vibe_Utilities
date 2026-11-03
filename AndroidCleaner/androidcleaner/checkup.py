@@ -114,7 +114,7 @@ def run(adb: Adb, days: int = 30, log=print) -> tuple[list[Section], dict]:
         s.status = WARN
         s.lines.append("Private DNS pemblokir iklan belum aktif.")
         s.actions.append(("ac ads dns adguard", "blokir iklan di semua aplikasi & browser"))
-    third = {p.name for p in pkgs.values() if not p.system and p.installed}
+    third = {p.name for p in pkgs.values() if not p.system and p.installed and p.enabled}
     overlay = adblock.overlay_apps(adb, third)
     if overlay:
         s.lines.append(f"Aplikasi user yang boleh tampil di atas aplikasi lain: {', '.join(overlay)}")
