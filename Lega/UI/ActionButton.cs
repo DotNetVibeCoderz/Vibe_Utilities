@@ -1,8 +1,8 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace Lega.UI;
 
-public enum ButtonKind { Primary, Secondary, Quiet }
+public enum ButtonKind { Primary, Secondary, Quiet, OnDark }
 
 public sealed class ActionButton : Control
 {
@@ -26,8 +26,21 @@ public sealed class ActionButton : Control
         AccessibleRole = AccessibleRole.PushButton;
     }
 
-    public int MeasureWidth() =>
-        TextRenderer.MeasureText(Text, Font, Size.Empty, Flags).Width + (int)this.Px(36);
+    /// <summary>Ikon Segoe Fluent Icons di kiri teks (opsional).</summary>
+    public string? Glyph { get; init; }
+
+    private const TextFormatFlags Measure = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
+
+    private float GlyphSlot => Glyph is null ? 0 : this.Px(16) + this.Px(8);
+
+    public int MeasureWidth() => MeasureText() + (int)(this.Px(40) + GlyphSlot);
+
+    private int MeasureText()
+    {
+        if (!IsHandleCreated) return TextRenderer.MeasureText(Text, Font, Size.Empty, Measure).Width;
+        using var g = CreateGraphics();
+        return TextRenderer.MeasureText(g, Text, Font, Size.Empty, Measure).Width;
+    }
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -36,7 +49,7 @@ public sealed class ActionButton : Control
         g.Clear(BackColor);
 
         var r = new RectangleF(1, 1, Width - 2, Height - 2);
-        float radius = this.Px(8);
+        float radius = this.Px(6);
 
         Color fill, text, border = Color.Empty;
         switch (Kind)
@@ -46,9 +59,15 @@ public sealed class ActionButton : Control
                 text = !Enabled ? Theme.Muted : Color.White;
                 break;
             case ButtonKind.Secondary:
-                fill = !Enabled ? Theme.Mist : _down ? Theme.Line : _hover ? Theme.Hover : Theme.Surface;
+                fill = !Enabled ? Theme.Paper : _down ? Theme.Line : _hover ? Theme.Hover : Theme.Surface;
                 border = Theme.Edge;
                 text = !Enabled ? Theme.Muted : Theme.Ink;
+                break;
+            case ButtonKind.OnDark:
+                // Kunyit = ruang yang bisa dikosongkan; tombol ini membuka lebih banyak lagi.
+                fill = _down ? Theme.PineDeep : _hover && Enabled ? Theme.PineHover : BackColor;
+                border = Enabled ? Theme.Turmeric : Theme.PineLine;
+                text = !Enabled ? Theme.OnPineMuted : Theme.Turmeric;
                 break;
             default:
                 fill = _down ? Theme.Line : _hover && Enabled ? Theme.Surface : BackColor;
@@ -63,12 +82,26 @@ public sealed class ActionButton : Control
             Gfx.DrawRound(g, pen, r, radius);
         }
 
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, text,
-            Flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        if (Glyph is null)
+        {
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, text,
+                Flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+        else
+        {
+            // Ikon + teks dipusatkan sebagai satu kelompok.
+            int tw = TextRenderer.MeasureText(g, Text, Font, Size.Empty, Measure).Width;
+            float icon = this.Px(16), gap = this.Px(8);
+            float x = Math.Max(this.Px(12), (Width - (icon + gap + tw)) / 2f);
+            TextRenderer.DrawText(g, Glyph, Theme.Icon(Font.SizeInPoints), Gfx.Rect(x, 0, icon, Height), text,
+                Flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, Text, Font, Gfx.Rect(x + icon + gap, 0, Width - (x + icon + gap) - this.Px(8), Height), text,
+                Flags | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+        }
 
         if (Focused && ShowFocusCues)
         {
-            using var ring = new Pen(Theme.Accent, this.Px(2f));
+            using var ring = new Pen(Kind == ButtonKind.OnDark ? Theme.Turmeric : Kind == ButtonKind.Primary ? Color.White : Theme.Accent, this.Px(2f));
             Gfx.DrawRound(g, ring, RectangleF.Inflate(r, -this.Px(3), -this.Px(3)), radius - 2);
         }
     }
@@ -100,12 +133,15 @@ public sealed class ActionButton : Control
     }
 }
 
-/// <summary>Garis tipis 2 px: pembatas saat diam, penanda aktivitas saat memindai atau membersihkan.</summary>
+/// <summary>Garis tipis di tepi bawah panel instrumen: diam saat siap, berjalan saat memindai atau membersihkan.</summary>
 public sealed class SlimProgress : Control
 {
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 16 };
     private float _pos;
     private bool _active;
+
+    public Color TrackColor { get; set; } = Theme.Line;
+    public Color RunnerColor { get; set; } = Theme.Accent;
 
     public SlimProgress()
     {
@@ -136,13 +172,13 @@ public sealed class SlimProgress : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
-        g.Clear(Theme.Line);
+        g.Clear(TrackColor);
         if (!_active) return;
 
         int seg = (int)(Width * 0.28f);
         float p = SystemInformation.UIEffectsEnabled ? _pos : 0.4f;
         int x = (int)(-seg + (Width + seg) * p);
-        using var b = new SolidBrush(Theme.Accent);
+        using var b = new SolidBrush(RunnerColor);
         g.FillRectangle(b, x, 0, seg, Height);
     }
 

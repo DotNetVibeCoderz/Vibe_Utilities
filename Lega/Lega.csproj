@@ -15,6 +15,18 @@
     <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);WFO1000</NoWarn>
+    <ApplicationIcon>Assets\lega.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>Lega</Product>
+    <Company>Gravicode Studios</Company>
+    <Authors>Gravicode Studios, dipimpin oleh Kang Fadhil</Authors>
+    <Copyright>© 2026 Gravicode Studios</Copyright>
+    <Description>Pembersih drive C untuk Windows 11</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\lega.ico" LogicalName="Lega.lega.ico" />
+    <None Remove="installer\**" />
+  </ItemGroup>
 
 </Project>
